@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # Base de données
+  db:
+    image: postgres:15
+    container_name: yam_master_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: casino_password
+      POSTGRES_DB: yam_master
+    volumes:
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql # Injecte le SQL
+      - postgres_data:/var/lib/postgresql/data
+
+  # Backend (API + Socket.io)
+  backend:
+    build: ./backend
+    container_name: yam_master_server
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://admin:casino_password@db:5432/yam_master
+      PORT: 3000
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

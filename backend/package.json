@@ -1,0 +1,18 @@
+{
+  "name": "socket-io-expo-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "pg": "^8.20.0",
+    "socket.io": "^4.8.3",
+    "uniqid": "^5.4.0"
+  }
+}
