@@ -29,9 +29,9 @@ export default function OnlineGameScreen({ navigation }) {
         return () => {
             socket.off('game.start');
             socket.off('opponent.left');
-            socket.emit('queue.leave'); // Optionnel: quitter la file si on sort de l'écran
+            socket.emit('queue.leave'); 
         };
-    }, [isConnected]); // On relance si la connexion s'établit
+    }, [isConnected]);
 
     const factionColor = user?.faction === 'alliance' ? '#1e90ff' : '#8b0000';
 

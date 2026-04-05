@@ -5,11 +5,11 @@ const TURN_DURATION = 60;
 
 const DECK_INIT = {
     dices: [
-        { id: 1, value: '', locked: true },
-        { id: 2, value: '', locked: true },
-        { id: 3, value: '', locked: true },
-        { id: 4, value: '', locked: true },
-        { id: 5, value: '', locked: true },
+        { id: 1, value: '', locked: false },
+        { id: 2, value: '', locked: false },
+        { id: 3, value: '', locked: false },
+        { id: 4, value: '', locked: false },
+        { id: 5, value: '', locked: false },
     ],
     rollsCounter: 0,
     rollsMaximum: 3
@@ -182,14 +182,15 @@ const GameService = {
     dices: {
         roll: (dicesToRoll) => {
             return dicesToRoll.map(dice => {
-                if (dice.value === "" || !dice.locked) {
-                    return {
-                        id: dice.id,
-                        value: String(Math.floor(Math.random() * 6) + 1),
-                        locked: false
-                    };
-                }
-                return dice;
+            // On lance si : valeur vide (1er tour) OU si non locké
+            if (dice.value === "" || !dice.locked) {
+                return {
+                    ...dice,
+                    value: String(Math.floor(Math.random() * 6) + 1),
+                    locked: false // On déverrouille après un lancer pour forcer le joueur à re-cliquer
+                };
+            }
+            return dice;
             });
         },
         lockEveryDice: (dicesToLock) => dicesToLock.map(dice => ({ ...dice, locked: true }))
@@ -242,6 +243,7 @@ const GameService = {
 
     grid: {
         resetcanBeCheckedCells: (grid) => grid.map(row => row.map(c => ({ ...c, canBeChecked: false }))),
+        
         updateGridAfterSelectingChoice: (idSelectedChoice, grid) => {
             return grid.map(row => row.map(cell => {
                 if (cell.id === idSelectedChoice && cell.owner === null) {
@@ -250,6 +252,7 @@ const GameService = {
                 return cell;
             }));
         },
+
         selectCell: (idCell, rowIndex, cellIndex, currentTurn, grid) => {
             return grid.map((row, rIdx) => row.map((cell, cIdx) => {
                 if (cell.id === idCell && rIdx === rowIndex && cIdx === cellIndex) {
@@ -258,60 +261,76 @@ const GameService = {
                 return cell;
             }));
         },
+
         calculatePlayerScore: (grid, playerKey) => {
-            let score = 0;
-            const size = 5;
+            let totalScore = 0;
             let hasFiveAligned = false;
 
-            const getScoreFromCells = (cells) => {
-                let lineScore = 0;
-                let currentStreak = 0;
+            // Fonction CRUCIALE : Compte le max de pions CONSÉCUTIFS dans un tableau de cellules
+            const getMaxConsecutive = (cells) => {
+                let maxConsecutive = 0;
+                let currentConsecutive = 0;
 
-                for (let i = 0; i < cells.length; i++) {
-                    if (cells[i].owner === playerKey) {
-                        currentStreak++;
+                cells.forEach(cell => {
+                    if (cell && cell.owner === playerKey) {
+                        currentConsecutive++;
+                        if (currentConsecutive > maxConsecutive) {
+                            maxConsecutive = currentConsecutive;
+                        }
                     } else {
-                        // On calcule le score du bloc qui vient de se terminer
-                        if (currentStreak === 5) { hasFiveAligned = true; lineScore += 3; }
-                        else if (currentStreak === 4) lineScore += 2;
-                        else if (currentStreak === 3) lineScore += 1;
-                        currentStreak = 0; // Reset pour le prochain bloc sur la même ligne
+                        currentConsecutive = 0;
                     }
-                }
-                // Vérification après la boucle pour le dernier bloc de la ligne
-                if (currentStreak === 5) { hasFiveAligned = true; lineScore += 3; }
-                else if (currentStreak === 4) lineScore += 2;
-                else if (currentStreak === 3) lineScore += 1;
-                
-                return lineScore;
+                });
+                return maxConsecutive;
             };
 
-            // 1. Horizontales
-            for (let r = 0; r < size; r++) {
-                score += getScoreFromCells(grid[r]);
+            const updateScoreFromConsecutive = (count) => {
+                if (count >= 5) { hasFiveAligned = true; return 3; }
+                if (count === 4) return 2;
+                if (count === 3) return 1;
+                return 0;
+            };
+
+            // 1. Horizontales (Lignes)
+            for (let i = 0; i < 5; i++) {
+                totalScore += updateScoreFromConsecutive(getMaxConsecutive(grid[i]));
             }
 
-            // 2. Verticales
-            for (let c = 0; c < size; c++) {
-                const colCells = grid.map(row => row[c]);
-                score += getScoreFromCells(colCells);
+            // 2. Verticales (Colonnes)
+            for (let i = 0; i < 5; i++) {
+                totalScore += updateScoreFromConsecutive(getMaxConsecutive(grid.map(row => row[i])));
             }
 
-            // 3. Diagonale descendante (Haut-Gauche vers Bas-Droite)
-            const diag1 = [grid[0][0], grid[1][1], grid[2][2], grid[3][3], grid[4][4]];
-            score += getScoreFromCells(diag1);
+            // 3. Diagonales Descendantes (\)
+            const diagDesc = [
+                [grid[0][0], grid[1][1], grid[2][2], grid[3][3], grid[4][4]], // Grande
+                [grid[0][1], grid[1][2], grid[2][3], grid[3][4]],             // 4 cases
+                [grid[1][0], grid[2][1], grid[3][2], grid[4][3]],             // 4 cases
+                [grid[0][2], grid[1][3], grid[2][4]],                         // 3 cases
+                [grid[2][0], grid[3][1], grid[4][2]]                          // 3 cases
+            ];
+            diagDesc.forEach(line => {
+                totalScore += updateScoreFromConsecutive(getMaxConsecutive(line));
+            });
 
-            // 4. Diagonale ascendante (Bas-Gauche vers Haut-Droite)
-            const diag2 = [grid[4][0], grid[3][1], grid[2][2], grid[1][3], grid[0][4]];
-            score += getScoreFromCells(diag2);
+            // 4. Diagonales Ascendantes (/)
+            const diagAsc = [
+                [grid[4][0], grid[3][1], grid[2][2], grid[1][3], grid[0][4]], // Grande
+                [grid[3][0], grid[2][1], grid[1][2], grid[0][3]],             // 4 cases
+                [grid[4][1], grid[3][2], grid[2][3], grid[1][4]],             // 4 cases
+                [grid[2][0], grid[1][1], grid[0][2]],                         // 3 cases
+                [grid[4][2], grid[3][3], grid[2][4]]                          // 3 cases
+            ];
+            diagAsc.forEach(line => {
+                totalScore += updateScoreFromConsecutive(getMaxConsecutive(line));
+            });
 
-            return { score, hasFiveAligned };
+            return { score: totalScore, hasFiveAligned };
         }
-        
     },
     timer: {
         getTurnDuration: () => TURN_DURATION,
-        getEndTurnDuration: () => 10
+        getEndTurnDuration: () => 5
     }
     
 };

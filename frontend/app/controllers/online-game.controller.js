@@ -5,14 +5,14 @@ import Board from "../components/board/board.component";
 import EndGameModal from "../components/modals/end-game.modal";
 
 export default function OnlineGameController({ user, factionColor, gameData, navigation }) {
-    // 1. On récupère socket ET isConnected
     const { socket, isConnected } = useContext(SocketContext);
 
+    // Initialisation cohérente avec le serveur (22 pions)
     const [scores, setScores] = useState({
         userScore: 0,
-        userPions: 12,
+        userPions: 22,
         opponentScore: 0,
-        opponentPions: 12
+        opponentPions: 22
     });
 
     const [endGame, setEndGame] = useState({
@@ -23,26 +23,28 @@ export default function OnlineGameController({ user, factionColor, gameData, nav
     });
 
     useEffect(() => {
-        // 2. Vérification sécurisée
         if (!socket || !isConnected) return;
 
+        // Mise à jour des scores
         socket.on('game.scores.view-state', (data) => {
             setScores(data);
         });
 
+        // Fin de partie
         socket.on('game.end', (data) => {
+            const isPlayer1 = socket.id === data.p1Id;
+            const myKey = isPlayer1 ? 'player:1' : 'player:2';
+            
             let result = 'draw';
             if (data.winner !== 'draw') {
-                // On compare l'ID du joueur local avec celui du player1 de la game
-                const myKey = gameData.idPlayer === socket.id ? 'player:1' : 'player:2';
-                result = data.winner === myKey ? 'win' : 'lose';
+                result = (data.winner === myKey) ? 'win' : 'lose';
             }
 
             setEndGame({
                 visible: true,
                 result: result,
-                p1Score: data.p1Score,
-                p2Score: data.p2Score
+                p1Score: data.p1Score, 
+                p2Score: data.p2Score 
             });
         });
 
@@ -54,24 +56,24 @@ export default function OnlineGameController({ user, factionColor, gameData, nav
 
     const handleRestart = () => {
         setEndGame({ ...endGame, visible: false });
-        socket.emit('queue.join'); // Rejoint une nouvelle file
+        socket.emit('queue.join', { username: user.username }); 
     };
 
     const handleQuit = () => {
         setEndGame({ ...endGame, visible: false });
-        // navigation.navigate('Home'); // Si tu as un router
+        // Retour au menu de sélection (Online ou Bot)
+        // Remplace 'GameSelection' par le nom exact de ta route menu
+        navigation.navigate('GameSelection'); 
     };
 
     return (
         <View style={styles.fullScreen}>
             <Board 
-                // Identité
                 username={gameData?.userName || user.username} 
                 userFaction={gameData?.userFaction || user.faction}
                 opponentName={gameData?.opponentName || "Adversaire"}
                 opponentFaction={gameData?.opponentFaction}
                 
-                // Scores et Pions (Vient du state synchronisé avec le serveur)
                 userScore={scores.userScore}
                 userPions={scores.userPions}
                 opponentScore={scores.opponentScore}

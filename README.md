@@ -1,82 +1,67 @@
-# ⚔️ Yam Master: Azeroth Edition (Socket.io & React Native)
+# ⚔️ Yam Master: Azeroth Edition 
 
 <p align="center">
-  <a href="https://itunes.apple.com/app/apple-store/id982107779">
-    <img alt="Supports Expo iOS" src="https://img.shields.io/badge/iOS-4630EB.svg?style=flat-square&logo=APPLE&labelColor=999999&logoColor=fff" />
-  </a>
-  <a href="https://play.google.com/store/apps/details?id=host.exp.exponent">
-    <img alt="Supports Expo Android" src="https://img.shields.io/badge/Android-4630EB.svg?style=flat-square&logo=ANDROID&labelColor=A4C639&logoColor=fff" />
-  </a>
-  <a href="https://docs.expo.dev/workflow/web/">
-    <img alt="Supports Expo Web" src="https://img.shields.io/badge/web-4630EB.svg?style=flat-square&logo=GOOGLE-CHROME&labelColor=4285F4&logoColor=fff" />
-  </a>
+  <img src="https://img.shields.io/badge/Lore-World%20of%20Warcraft-red?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Stack-React%20Native%20%7C%20Node.js%20%7C%20Socket.io-blue?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge" />
 </p>
 
-Ce projet est une application mobile full-stack utilisant **React Native (Expo)** et **Socket.io**. Il transforme le jeu de plateau Yam Master en une bataille stratégique entre la **Horde** et l'**Alliance**.
+**Yam Master: Azeroth Edition** est une réinvention stratégique du célèbre jeu de dés, transposée dans l'univers de **World of Warcraft**. Ce n'est plus seulement une question de chance, mais une guerre de territoire en temps réel entre les deux factions iconiques d'Azeroth.
 
 ---
 
-## 🚀 Comment l'utiliser (Déploiement)
+## 📜 Le Lore : La Bataille pour la Grille
 
-### 1. Serveur (Backend)
-Le serveur gère la logique de jeu, le matchmaking et la persistance.
-- `cd backend`
-- `npm install`
-- Configurez vos accès PostgreSQL dans le contrôleur d'authentification.
-- `npm start`
-- **Tunneling :** Installez [ngrok](https://ngrok.com/download) et lancez `ngrok http 3000`. Copiez l'URL HTTPS (ex: `https://f733-xxx.ngrok.io`).
+Alors que les tensions atteignent leur paroxysme entre Orgrimmar et Hurlevent, la **Horde** et l'**Alliance** se disputent le contrôle de zones stratégiques sur une grille mystique. Chaque combinaison de dés réussie représente une manœuvre militaire permettant de placer une unité sur le champ de bataille (la grille 5x5).
 
-### 2. Application (Frontend)
-- `npm install`
-- Ouvrez le fichier de configuration des sockets (ex: `App.js`) et modifiez la variable `socketEndpoint` avec votre URL ngrok.
-- `npx expo start`
+### 🚩 Les Factions
+* **La Horde (Rouge)** : Portés par la force brute et l'honneur. Représentés par des guerriers prêts à tout pour la victoire.
+* **L'Alliance (Bleu)** : Guidés par la Lumière et la discipline. Leurs tactiques sont précises et défensives.
+
+Le but est simple mais impitoyable : **Dominer la grille**. Alignez vos troupes pour fortifier vos positions ou bloquez l'avancée ennemie avant qu'ils ne capturent vos bastions.
 
 ---
 
-## 🛠️ Architecture Technique & Variables
+## 🎮 Mécaniques de Jeu & Stratégie
 
-### Architecture Logicielle
-Le projet suit une séparation stricte des responsabilités :
-- **GameService (Backend) :** Centralise la logique pure (calcul des scores, détection des combinaisons, gestion de la grille).
-- **Socket Management :** Gère les événements bidirectionnels en temps réel.
-- **Hooks React (Frontend) :** Utilisation de `useState` et `useEffect` pour synchroniser l'UI avec l'état du serveur.
+Le jeu fusionne les règles du **Yams (Yahtzee)** et une mécanique de **capture de territoire**.
 
-### Variables d'État Globales (GameState)
-Le jeu repose sur un objet `gameState` complexe synchronisé via socket :
-- `currentTurn` : Gère l'alternance entre `player:1` et `player:2`.
-- `timer` : Compte à rebours de 60s synchronisé pour éviter la triche côté client.
-- `grid` : Matrice 5x5 contenant les objets `cell` (viewContent, owner, canBeChecked).
-- `deck` : Objet contenant les dés (`dices`), le `rollsCounter` (max 3) et les états de verrouillage.
-- `pions` : Compteur de ressources (12 par joueur).
-
-### Événements Socket Clés
-- `game.dices.roll` : Déclenche le lancer côté serveur.
-- `game.choices.selected` : Valide la combinaison choisie (Full, Brelan...).
-- `game.grid.selected` : Enregistre le placement d'un pion et déclenche le recalcul des scores.
-- `game.end` : Émis lorsqu'une condition de victoire est remplie.
+1.  **Phase de Dés** : Le joueur dispose de 3 lancers par tour. Il peut verrouiller ses dés pour viser des combinaisons (Brelan, Carré, Full, Suite, ou le puissant Yam).
+2.  **Placement Tactique** : Une combinaison validée débloque des cases spécifiques sur la grille 5x5.
+3.  **Gestion des Ressources** : Chaque camp commence avec **12 pions**. Chaque pose de pion est définitive et réduit vos réserves.
+4.  **Conditions de Victoire** : 
+    * **Le Choc de Guerre** : Aligner **5 pions** (Horizontal, Vertical ou Diagonal) pour une victoire instantanée.
+    * **L'Attrition** : Si les pions sont épuisés, le serveur compare les scores basés sur les alignements de 3 et 4 pions.
 
 ---
 
-## 🎮 Logique de Jeu Avancée
+## 🏗️ Architecture Technique
 
-### Système de Scoring & Alignements
-Le calcul des points est géré par `calculatePlayerScore`. Il parcourt la grille pour identifier les suites de pions :
-- **Horizontal & Vertical :** Analyse de chaque ligne et colonne.
-- **Diagonales :** Prise en compte de la diagonale principale et secondaire.
-- **Pondération :** Un alignement de 3 = 1pt, 4 = 2pts, 5 = 3pts (Victoire).
+Le projet repose sur une architecture **Event-Driven** (pilotée par les événements) garantissant une synchronisation millimétrée entre les joueurs.
 
-### Conditions de Victoire
-1. **Alignement Total :** Dès qu'un joueur aligne 5 pions, il est déclaré vainqueur (isWinner: true).
-2. **Épuisement :** Si un joueur n'a plus de pions, le serveur compare les scores finaux.
+### Flux de Données (Real-time)
+* **Backend (Node.js/Express)** : Le "Cerveau". Il valide chaque lancer de dé et chaque placement de pion pour éviter toute triche. Il gère le matchmaking via une file d'attente (`queue`).
+* **Socket.io** : Assure le transport des données bidirectionnel avec une latence minimale.
+* **Frontend (React Native/Expo)** : Une interface réactive qui consomme le `gameState` envoyé par le serveur.
 
----
 
-## 📦 Dépendances et Outils
-- **Backend :** `socket.io`, `express`, `pg` (PostgreSQL), `bcrypt` (sécurité), `jsonwebtoken` (Auth), `uniqid` (ID de partie).
-- **Frontend :** `socket.io-client`, `react-navigation`, `expo-constants`.
 
-## 📝 Notes de Développement
-Contrairement aux WebSockets standards, **Socket.io** permet une gestion robuste des reconnexions et des "rooms". Pour le développement mobile, l'usage de **ngrok** est indispensable pour contourner les restrictions HTTPS de React Native en local.
+### Architecture du Code (Backend)
+* `/services` : Logique pure (calcul des scores, détection des suites, IA du Bot).
+* `/controllers` : Gestion de l'authentification et de la persistance (PostgreSQL).
+* `index.js` : Point d'entrée gérant les cycles de vie des sockets.
 
 ---
-*Développé pour le projet final de développement Mobile & Temps Réel - Univers World of Warcraft.*
+
+## 🛠️ Configuration & Installation
+
+### 🔑 Variables d'environnement (.env)
+Créez un fichier `.env` dans le dossier `/backend` :
+
+```env
+PORT=3000
+DB_HOST=localhost
+DB_USER=votre_utilisateur
+DB_PASSWORD=votre_mot_de_passe
+DB_NAME=yam_master_db
+JWT_SECRET=azeroth_is_bleeding

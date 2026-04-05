@@ -22,13 +22,14 @@ const PlayerDeck = ({ factionColor }) => {
     <View style={styles.container}>
       <View style={styles.diceRow}>
         {deckData.dices.map((dice) => (
-            <Dice
-                key={dice.id}
-                locked={dice.locked}
-                value={dice.value}
-                onPress={() => socket.emit("game.dices.lock", dice.id)}
-            />
-        ))}
+          <Dice
+              key={dice.id}
+              locked={dice.locked}
+              value={dice.value}
+              
+              onPress={() => socket.emit("game.dices.lock", { diceId: dice.id })} 
+          />
+      ))}
       </View>
 
       {deckData.displayRollButton && (

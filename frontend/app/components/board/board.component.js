@@ -1,3 +1,5 @@
+// board.component
+
 import React from "react";
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import PlayerTimer from "./timers/player-timer.component";
@@ -8,11 +10,31 @@ import Choices from './choices/choices.component';
 import Grid from './grid/grid.component';
 import RankIcon from "../visuals/rank-icon.component";
 
-const Board = ({ 
-  username, userFaction, userPions, userScore,
-  opponentName, opponentFaction, opponentPions, opponentScore,
-  factionColor 
-}) => {
+const Board = (props) => {
+  // On extrait les données brutes envoyées par le serveur
+  const { 
+    player1Name, player1Faction, player1Pions, player1Score,
+    player2Name, player2Faction, player2Pions, player2Score,
+    factionColor, yourPlayerKey 
+  } = props;
+
+  // LOGIQUE DE MAPPING : On définit qui est l'utilisateur et qui est l'adversaire
+  const isPlayer1 = yourPlayerKey === 'player:1';
+
+  const username = isPlayer1 ? player1Name : player2Name;
+  const userFaction = isPlayer1 ? player1Faction : player2Faction;
+  const userPions = isPlayer1 ? player1Pions : player2Pions;
+  const userScore = isPlayer1 ? player1Score : player2Score;
+
+  const opponentName = isPlayer1 ? player2Name : player1Name;
+  const opponentFaction = isPlayer1 ? player2Faction : player1Faction;
+  const opponentPions = isPlayer1 ? player2Pions : player1Pions;
+  const opponentScore = isPlayer1 ? player2Score : player1Score;
+
+  // Sécurité pour éviter le crash .toUpperCase()
+  const displayUsername = (username || "JOUEUR").toUpperCase();
+  const displayOpponentName = (opponentName || "ADVERSAIRE").toUpperCase();
+
   return (
     <SafeAreaView style={styles.container}>
       
@@ -21,8 +43,8 @@ const Board = ({
         <View style={styles.userInfo}>
           <RankIcon faction={opponentFaction} rank={1} />
           <View>
-            <Text style={styles.opponentName}>{opponentName || "ADVERSAIRE"}</Text>
-            <Text style={styles.miniScore}>Pions: {opponentPions} | Score: {opponentScore}</Text>
+            <Text style={styles.opponentName}>{displayOpponentName}</Text>
+            <Text style={styles.miniScore}>Pions: {opponentPions ?? 0} | Score: {opponentScore ?? 0}</Text>
           </View>
         </View>
         <OpponentTimer />
@@ -49,12 +71,12 @@ const Board = ({
       </View>
 
       {/* Footer - Info Joueur */}
-      <View style={[styles.bottomBar, { borderTopColor: factionColor }]}>
+      <View style={[styles.bottomBar, { borderTopColor: factionColor || '#D4AF37' }]}>
         <View style={styles.userInfo}>
           <RankIcon faction={userFaction} rank={1} />
           <View>
-            <Text style={[styles.playerName, { color: factionColor }]}>{username.toUpperCase()}</Text>
-            <Text style={styles.miniScore}>Pions: {userPions} | Score: {userScore}</Text>
+            <Text style={[styles.playerName, { color: factionColor || '#FFF' }]}>{displayUsername}</Text>
+            <Text style={styles.miniScore}>Pions: {userPions ?? 0} | Score: {userScore ?? 0}</Text>
           </View>
         </View>
         <PlayerTimer factionColor={factionColor} />
@@ -77,7 +99,6 @@ const styles = StyleSheet.create({
   sideBar: { flex: 1, marginLeft: 15, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 5 },
   opponentName: { color: '#aaa', fontWeight: 'bold' },
   playerName: { fontWeight: 'bold', letterSpacing: 1 },
-  scoreText: { color: '#FFF', fontWeight: 'bold' },
   miniScore: { color: '#FFF', fontSize: 10, fontWeight: 'bold' }
 });
 

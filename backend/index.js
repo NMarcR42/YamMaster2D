@@ -6,11 +6,12 @@ const bodyParser = require('body-parser');
 const uniqid = require('uniqid');
 
 const io = require('socket.io')(http, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+    cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 const GameService = require('./services/game.service');
 const AuthController = require('./controllers/auth.controller');
+const BotService = require('./services/bot.service'); 
 
 app.use(cors()); 
 app.use(bodyParser.json());
@@ -67,20 +68,149 @@ const updateClientsViewScores = (game) => {
     if (game.player2Socket) game.player2Socket.emit('game.scores.view-state', p2Data);
 };
 
-const createGame = (player1Socket, player2Socket) => {
+// --- LOGIQUE DU BOT ---
+const triggerBotTurn = async (game) => {
+    if (!game || !game.gameState || game.gameState.currentTurn !== 'player:2' || game.gameState.winner) return;
+
+    try {
+        const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+        for (let i = 0; i < 3; i++) {
+            const activeGame = games.find(g => g.idGame === game.idGame);
+            if (!activeGame) return;
+
+            await delay(1000);
+            const deck = activeGame.gameState.deck;
+            deck.dices = GameService.dices.roll(deck.dices);
+            deck.rollsCounter++;
+            
+            activeGame.gameState.choices.availableChoices = GameService.choices.findCombinations(
+                deck.dices, false, deck.rollsCounter === 1, activeGame.gameState.grid
+            );
+            
+            updateClientsViewDecks(activeGame);
+            updateClientsViewChoices(activeGame);
+
+            if (deck.rollsCounter < deck.rollsMaximum) {
+                const locks = BotService.decideDiceToLock(deck.dices, deck.rollsCounter, activeGame.difficulty);
+                deck.dices.forEach(d => { if (locks.includes(d.id)) d.locked = true; });
+                if (activeGame.difficulty === 'pro' && activeGame.gameState.choices.availableChoices.some(c => c.id === 'yam')) break;
+            } else {
+                deck.dices = GameService.dices.lockEveryDice(deck.dices);
+                activeGame.gameState.timer = GameService.timer.getEndTurnDuration();
+            }
+            updateClientsViewDecks(activeGame);
+        }
+
+        await delay(1000);
+        const choices = game.gameState.choices.availableChoices;
+        if (!choices || choices.length === 0) return finalizeTurn(game); 
+
+        const choice = BotService.chooseBestCombination(choices, game.difficulty);
+        if (!choice || !choice.id) return finalizeTurn(game);
+
+        game.gameState.choices.idSelectedChoice = choice.id;
+        game.gameState.grid = GameService.grid.updateGridAfterSelectingChoice(choice.id, game.gameState.grid);
+        updateClientsViewChoices(game);
+        updateClientsViewGrid(game);
+
+        await delay(1000);
+        const cellCoords = BotService.chooseGridCell(game.gameState.grid, choice.id, game.difficulty, 'player:2');
+        
+        if (cellCoords && cellCoords.cellId && cellCoords.rIdx !== undefined) {
+            handleGridSelection(game, 'player:2', cellCoords.cellId, cellCoords.rIdx, cellCoords.cIdx);
+        } else {
+            finalizeTurn(game);
+        }
+
+    } catch (error) {
+        console.error("❌ ERREUR BOT :", error);
+        if (game) finalizeTurn(game);
+    }
+};
+
+const handleGridSelection = (game, playerKey, cellId, rowIndex, cellIndex) => {
+    try {
+        const gs = game.gameState;
+        if (rowIndex === undefined || rowIndex === -1 || !gs.grid[rowIndex]) return finalizeTurn(game);
+
+        const cell = gs.grid[rowIndex][cellIndex];
+        if (!cell) return finalizeTurn(game);
+        if (playerKey === 'player:1' && !cell.canBeChecked) return;
+
+        gs.grid = GameService.grid.selectCell(cellId, rowIndex, cellIndex, playerKey, gs.grid);
+        gs.grid = GameService.grid.resetcanBeCheckedCells(gs.grid);
+
+        if (playerKey === 'player:1') gs.player1Pions--; else gs.player2Pions--;
+
+        const resP1 = GameService.grid.calculatePlayerScore(gs.grid, 'player:1');
+        const resP2 = GameService.grid.calculatePlayerScore(gs.grid, 'player:2');
+        gs.player1Score = resP1.score;
+        gs.player2Score = resP2.score;
+
+        updateClientsViewScores(game);
+        updateClientsViewGrid(game);
+
+        if (resP1.hasFiveAligned) gs.winner = 'player:1';
+        else if (resP2.hasFiveAligned) gs.winner = 'player:2';
+        else if (gs.player1Pions <= 0 || gs.player2Pions <= 0) {
+            if (gs.player1Score === gs.player2Score) gs.winner = 'draw';
+            else gs.winner = gs.player1Score > gs.player2Score ? 'player:1' : 'player:2';
+        }
+
+        if (gs.winner) {
+            const endData = { winner: gs.winner, p1Score: gs.player1Score, p2Score: gs.player2Score, p1Id: game.player1Id, p2Id: game.player2Id };
+            if (game.player1Socket) game.player1Socket.emit('game.end', endData);
+            if (game.player2Socket) game.player2Socket.emit('game.end', endData); // Notifier aussi le P2
+            
+            setTimeout(() => { 
+                const idx = games.findIndex(g => g.idGame === game.idGame); 
+                if (idx !== -1) games.splice(idx, 1); 
+            }, 5000);
+        } else {
+            finalizeTurn(game);
+        }
+    } catch (error) {
+        console.error("❌ ERROR handleGridSelection:", error);
+        finalizeTurn(game);
+    }
+};
+
+const createGame = (player1Socket, player2Socket, isVsBot = false, difficulty = 'easy') => {
     const gameData = GameService.init.gameState(); 
     const newGame = {
         idGame: uniqid(),
-        player1Socket, player2Socket,
-        player1Id: player1Socket.id, player2Id: player2Socket.id,
-        player1Name: player1Socket.username || "Joueur 1", player2Name: player2Socket.username || "Joueur 2",
-        player1Faction: player1Socket.faction || "horde", player2Faction: player2Socket.faction || "alliance",
-        gameState: gameData.gameState 
+        player1Socket, 
+        player2Socket: isVsBot ? null : player2Socket,
+        player1Id: player1Socket.id, 
+        player2Id: isVsBot ? 'bot-id' : player2Socket.id,
+        player1Name: player1Socket.username || "Joueur 1", 
+        player2Name: isVsBot ? `Bot (${difficulty.toUpperCase()})` : (player2Socket.username || "Joueur 2"),
+        player1Faction: player1Socket.faction || "horde", 
+        player2Faction: isVsBot ? "alliance" : (player2Socket.faction || "alliance"),
+        gameState: gameData.gameState,
+        isVsBot,
+        difficulty
     };
 
+    newGame.gameState.player1Score = 0;
+    newGame.gameState.player2Score = 0;
+    newGame.gameState.player1Pions = 22; 
+    newGame.gameState.player2Pions = 22;
+
     games.push(newGame);
-    player1Socket.emit('game.start', GameService.send.forPlayer.viewGameState('player:1', newGame));
-    player2Socket.emit('game.start', GameService.send.forPlayer.viewGameState('player:2', newGame));
+
+    player1Socket.emit('game.start', {
+        ...GameService.send.forPlayer.viewGameState('player:1', newGame),
+        yourPlayerKey: 'player:1' 
+    });
+
+    if (player2Socket) {
+        player2Socket.emit('game.start', {
+            ...GameService.send.forPlayer.viewGameState('player:2', newGame),
+            yourPlayerKey: 'player:2'
+        });
+    }
     
     updateClientsViewTimers(newGame);
     updateClientsViewDecks(newGame);
@@ -98,18 +228,46 @@ const createGame = (player1Socket, player2Socket) => {
             activeGame.gameState.deck = GameService.init.deck();
             activeGame.gameState.choices = GameService.init.choices();
             activeGame.gameState.grid = GameService.grid.resetcanBeCheckedCells(activeGame.gameState.grid);
+            
             updateClientsViewTimers(activeGame);
             updateClientsViewDecks(activeGame);
             updateClientsViewChoices(activeGame);
             updateClientsViewGrid(activeGame);
+            updateClientsViewScores(activeGame); // Assurer la synchro du score au changement de tour
+
+            if (activeGame.gameState.currentTurn === 'player:2' && activeGame.isVsBot) {
+                triggerBotTurn(activeGame);
+            }
         } else {
             updateClientsViewTimers(activeGame);
         }
     }, 1000);
 };
 
+const finalizeTurn = (game) => {
+    const gs = game.gameState;
+    gs.currentTurn = gs.currentTurn === 'player:1' ? 'player:2' : 'player:1';
+    gs.timer = GameService.timer.getTurnDuration();
+    gs.deck = GameService.init.deck();
+    gs.choices = GameService.init.choices();
+    
+    updateClientsViewTimers(game); 
+    updateClientsViewDecks(game); 
+    updateClientsViewChoices(game);
+    updateClientsViewGrid(game);
+    updateClientsViewScores(game); // Synchro score systématique
+
+    if (gs.currentTurn === 'player:2' && game.isVsBot) {
+        triggerBotTurn(game);
+    }
+};
+
 io.on('connection', socket => {
-    socket.on('user.setup', (data) => { socket.username = data.username; });
+    socket.on('user.setup', (data) => { socket.username = data.username; socket.faction = data.faction; });
+
+    socket.on('game.vs-bot.start', (data) => {
+        createGame(socket, null, true, data.difficulty);
+    });
 
     socket.on('queue.join', (data) => {
         if (data && data.username) socket.username = data.username;
@@ -127,8 +285,7 @@ io.on('connection', socket => {
 
         deck.dices = GameService.dices.roll(deck.dices);
         deck.rollsCounter++;
-        const combinations = GameService.choices.findCombinations(deck.dices, false, deck.rollsCounter === 1, game.gameState.grid);
-        game.gameState.choices.availableChoices = combinations;
+        game.gameState.choices.availableChoices = GameService.choices.findCombinations(deck.dices, false, deck.rollsCounter === 1, game.gameState.grid);
 
         if (deck.rollsCounter >= deck.rollsMaximum) {
             deck.dices = GameService.dices.lockEveryDice(deck.dices);
@@ -137,6 +294,19 @@ io.on('connection', socket => {
         updateClientsViewDecks(game);
         updateClientsViewChoices(game);
         updateClientsViewTimers(game);
+    });
+
+    socket.on('game.dices.lock', (data) => {
+        const game = games.find(g => g.player1Id === socket.id || g.player2Id === socket.id);
+        if (!game) return;
+        const playerKey = socket.id === game.player1Id ? 'player:1' : 'player:2';
+        if (game.gameState.currentTurn !== playerKey) return;
+
+        const dice = game.gameState.deck.dices.find(d => d.id === data.diceId);
+        if (dice) {
+            dice.locked = !dice.locked;
+            updateClientsViewDecks(game);
+        }
     });
 
     socket.on('game.choices.selected', (data) => {
@@ -152,43 +322,9 @@ io.on('connection', socket => {
     socket.on('game.grid.selected', (data) => {
         const game = games.find(g => g.player1Id === socket.id || g.player2Id === socket.id);
         if (!game) return;
-        const gs = game.gameState;
         const playerKey = socket.id === game.player1Id ? 'player:1' : 'player:2';
-
-        if (gs.currentTurn !== playerKey) return;
-        const cell = gs.grid[data.rowIndex][data.cellIndex];
-        if (!cell || !cell.canBeChecked) return;
-
-        gs.grid = GameService.grid.selectCell(data.cellId, data.rowIndex, data.cellIndex, playerKey, gs.grid);
-        gs.grid = GameService.grid.resetcanBeCheckedCells(gs.grid);
-
-        if (playerKey === 'player:1') gs.player1Pions--; else gs.player2Pions--;
-
-        const resP1 = GameService.grid.calculatePlayerScore(gs.grid, 'player:1');
-        const resP2 = GameService.grid.calculatePlayerScore(gs.grid, 'player:2');
-        gs.player1Score = resP1.score;
-        gs.player2Score = resP2.score;
-
-        // LOGIQUE VICTOIRE CORRIGÉE
-        if (resP1.hasFiveAligned) gs.winner = 'player:1';
-        else if (resP2.hasFiveAligned) gs.winner = 'player:2';
-        else if (gs.player1Pions <= 0 || gs.player2Pions <= 0) {
-            if (gs.player1Score === gs.player2Score) gs.winner = 'draw';
-            else gs.winner = gs.player1Score > gs.player2Score ? 'player:1' : 'player:2';
-        }
-
-        if (gs.winner) {
-            const finalData = { winner: gs.winner, p1Score: gs.player1Score, p2Score: gs.player2Score };
-            if (game.player1Socket) game.player1Socket.emit('game.end', { ...finalData, isWinner: gs.winner === 'player:1' });
-            if (game.player2Socket) game.player2Socket.emit('game.end', { ...finalData, isWinner: gs.winner === 'player:2' });
-            setTimeout(() => { const idx = games.findIndex(g => g.idGame === game.idGame); if (idx !== -1) games.splice(idx, 1); }, 5000);
-        } else {
-            gs.currentTurn = gs.currentTurn === 'player:1' ? 'player:2' : 'player:1';
-            gs.timer = GameService.timer.getTurnDuration();
-            gs.deck = GameService.init.deck();
-            gs.choices = GameService.init.choices();
-            updateClientsViewTimers(game); updateClientsViewDecks(game); updateClientsViewChoices(game); updateClientsViewGrid(game); updateClientsViewScores(game);
-        }
+        if (game.gameState.currentTurn !== playerKey) return;
+        handleGridSelection(game, playerKey, data.cellId, data.rowIndex, data.cellIndex);
     });
 
     socket.on('disconnect', () => {
