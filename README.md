@@ -69,6 +69,7 @@ Le projet repose sur une architecture **Event-Driven** (pilotée par les événe
     Docker & Docker Desktop (recommandé pour la base de données et le serveur).
 
     Node.js (LTS) installé localement pour le Frontend.
+    **Node.js** : Version **18.x (LTS)** minimum.
 
     Expo Go (sur smartphone) ou un navigateur web.
 
@@ -95,6 +96,7 @@ Le frontend a besoin de savoir où se trouve le serveur.
     Bash
 
     npm install
+    (Optionnel) "npm audit fix" si des vulnérabilités sont présentes
 
     Créez un fichier .env dans /frontend/ (utilisez .env.example comme modèle) :
     Extrait de code
