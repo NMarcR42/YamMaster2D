@@ -51,18 +51,18 @@ Le projet repose sur une architecture **Event-Driven** (pilotée par les événe
 * `/controllers` : Gestion de l'authentification et de la persistance (PostgreSQL).
 * `index.js` : Point d'entrée gérant les cycles de vie des sockets.
 
-/
-├── docker-compose.yml    # Orchestration du projet
-├── backend/
-│   ├── Dockerfile        # Image Node.js pour le serveur
-│   ├── index.js          # Serveur & Sockets (Port 3005)
-│   ├── init.sql          # Schéma de la base de données
-│   └── /services         # Logique métier (IA Bot, Scores)
-└── frontend/
-    ├── App.js            # Entrée de l'application
-    ├── .env              # Configuration de l'URL API
-    └── /app/contexts     # Socket.context (Gestion de la connexion)
----
+.
+├── docker-compose.yml         # Orchestration des services (DB + App)
+├── backend/                   # Dossier Serveur Node.js
+│   ├── index.js               # Point d'entrée & gestion des Sockets
+│   ├── Dockerfile             # Configuration de l'image Docker
+│   ├── init.sql               # Schéma initial PostgreSQL
+│   ├── controllers/           # Auth & Persistance des données
+│   └── services/              # Logique métier (IA Bot, Scores)
+└── frontend/                  # Dossier Application Mobile (React Native)
+    ├── App.js                 # Entrée principale de l'app
+    ├── .env                   # Configuration des URLs API/Socket
+    └── contexts/              # Gestion de l'état global (Socket.context)
 
 ## 🛠️ Configuration & Installation
 ### 📋 Pré-requis
