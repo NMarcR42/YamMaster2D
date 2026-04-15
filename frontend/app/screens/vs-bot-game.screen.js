@@ -1,6 +1,6 @@
 // app/screens/vs-bot-game.screen.js
 import React, { useState, useContext, useEffect } from "react";
-import { StyleSheet, View, TouchableOpacity, Text, SafeAreaView } from "react-native";
+import { StyleSheet, View, TouchableOpacity, Text } from "react-native";
 import { SocketContext } from '../contexts/socket.context';
 import OnlineGameController from "../controllers/online-game.controller"; 
 
@@ -42,8 +42,8 @@ export default function VsBotGameScreen({ navigation }) {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Text style={[styles.title, { color: factionColor }]}>MODE VS BOT</Text>
+        <View style={[styles.container, { paddingTop: 40 }]}>
+            <Text style={[styles.title, { color: factionColor || '#8b0000' }]}>MODE VS BOT</Text>
             
             <View style={styles.menu}>
                 <DifficultyBtn 
@@ -69,7 +69,7 @@ export default function VsBotGameScreen({ navigation }) {
             >
                 <Text style={styles.backText}>RETOUR</Text>
             </TouchableOpacity>
-        </SafeAreaView>
+        </View>
     );
 }
 

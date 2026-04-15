@@ -330,7 +330,7 @@ const GameService = {
     },
     timer: {
         getTurnDuration: () => TURN_DURATION,
-        getEndTurnDuration: () => 5
+        getEndTurnDuration: () => 10
     }
     
 };

@@ -15,8 +15,8 @@
 Alors que les tensions atteignent leur paroxysme entre Orgrimmar et Hurlevent, la **Horde** et l'**Alliance** se disputent le contrôle de zones stratégiques sur une grille mystique. Chaque combinaison de dés réussie représente une manœuvre militaire permettant de placer une unité sur le champ de bataille (la grille 5x5).
 
 ### 🚩 Les Factions
-* **La Horde (Rouge)** : Portés par la force brute et l'honneur. Représentés par des guerriers prêts à tout pour la victoire.
-* **L'Alliance (Bleu)** : Guidés par la Lumière et la discipline. Leurs tactiques sont précises et défensives.
+* 🔴**La Horde (Rouge)** : Portés par la force brute et l'honneur. Représentés par des guerriers prêts à tout pour la victoire.
+* 🔵**L'Alliance (Bleu)** : Guidés par la Lumière et la discipline. Leurs tactiques sont précises et défensives.
 
 Le but est simple mais impitoyable : **Dominer la grille**. Alignez vos troupes pour fortifier vos positions ou bloquez l'avancée ennemie avant qu'ils ne capturent vos bastions.
 
@@ -51,17 +51,78 @@ Le projet repose sur une architecture **Event-Driven** (pilotée par les événe
 * `/controllers` : Gestion de l'authentification et de la persistance (PostgreSQL).
 * `index.js` : Point d'entrée gérant les cycles de vie des sockets.
 
+/
+├── docker-compose.yml    # Orchestration du projet
+├── backend/
+│   ├── Dockerfile        # Image Node.js pour le serveur
+│   ├── index.js          # Serveur & Sockets (Port 3005)
+│   ├── init.sql          # Schéma de la base de données
+│   └── /services         # Logique métier (IA Bot, Scores)
+└── frontend/
+    ├── App.js            # Entrée de l'application
+    ├── .env              # Configuration de l'URL API
+    └── /app/contexts     # Socket.context (Gestion de la connexion)
 ---
 
 ## 🛠️ Configuration & Installation
+### 📋 Pré-requis
 
-### 🔑 Variables d'environnement (.env)
-Créez un fichier `.env` dans le dossier `/backend` :
+    Docker & Docker Desktop (recommandé pour la base de données et le serveur).
 
-```env
-PORT=3000
-DB_HOST=localhost
-DB_USER=votre_utilisateur
-DB_PASSWORD=votre_mot_de_passe
-DB_NAME=yam_master_db
-JWT_SECRET=azeroth_is_bleeding
+    Node.js (LTS) installé localement pour le Frontend.
+
+    Expo Go (sur smartphone) ou un navigateur web.
+
+### 🐳 Lancement Rapide (Docker)
+
+Cette méthode lance automatiquement la base de données PostgreSQL et le Backend Node.js.
+
+    À la racine du projet, lancez :
+    Bash
+
+    docker-compose up --build
+
+    Le serveur sera accessible sur http://localhost:3005.
+
+    La base de données sera initialisée automatiquement via ./backend/init.sql.
+
+### 📱 Configuration du Frontend (React Native / Expo)
+
+Le frontend a besoin de savoir où se trouve le serveur.
+
+    Allez dans le dossier /frontend.
+
+    Installez les dépendances :
+    Bash
+
+    npm install
+
+    Créez un fichier .env dans /frontend/ (utilisez .env.example comme modèle) :
+    Extrait de code
+
+    # Pour tester sur navigateur (Web)
+    EXPO_PUBLIC_API_URL=http://localhost:3005
+
+    # POUR TESTER SUR MOBILE PHYSIQUE :
+    # Remplacez localhost par VOTRE IP LOCALE (ex: http://192.168.1.XX:3005)
+
+    Lancez l'application :
+    Bash
+
+    npx expo start -c
+
+        Appuyez sur w pour lancer la version Web (recommandé pour la correction rapide).
+
+        Scannez le QR Code avec Expo Go pour tester sur mobile (vérifiez que votre smartphone est sur le même Wi-Fi).
+
+### ⚙️ Détails Techniques des Ports
+
+Pour éviter les conflits avec d'autres services (comme React ou Postgres local), le projet utilise les ports suivants :
+
+    3005 : Backend API & Socket.io (mappé dans Docker).
+
+    5432 : PostgreSQL (interne au réseau Docker).
+
+    8081 : Serveur de développement Expo Metro.
+
+    Note sur le mode Web : Si vous obtenez une erreur de connexion (Network Error) sur navigateur, assurez-vous que le .env du frontend pointe bien sur localhost:3005 et que vous avez relancé Expo avec l'option -c.

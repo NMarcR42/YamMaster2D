@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Alert } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, ActivityIndicator, Alert, View } from "react-native";
 import { SocketContext } from '../contexts/socket.context';
 import OnlineGameController from "../controllers/online-game.controller";
 
@@ -37,15 +37,15 @@ export default function OnlineGameScreen({ navigation }) {
 
     if (isSearching) {
         return (
-            <SafeAreaView style={styles.waitingContainer}>
-                <ActivityIndicator size="large" color={factionColor} />
+            <View style={[styles.waitingContainer, { paddingTop: 40 }]}> 
+                <ActivityIndicator size="large" color={factionColor || "#8b0000"} />
                 <Text style={[styles.waitingTitle, { color: factionColor }]}>
                     {isConnected ? "RECHERCHE D'UN ADVERSAIRE..." : "CONNEXION AU SERVEUR..."}
                 </Text>
                 <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
                     <Text style={styles.cancelText}>ANNULER</Text>
                 </TouchableOpacity>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -59,8 +59,23 @@ export default function OnlineGameScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    waitingContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-    waitingTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 20, textAlign: 'center' },
-    cancelButton: { marginTop: 40 },
-    cancelText: { color: '#666', textDecorationLine: 'underline' }
+    waitingContainer: { 
+        flex: 1, 
+        backgroundColor: '#000', 
+        justifyContent: 'center', 
+        alignItems: 'center' 
+    },
+    waitingTitle: { 
+        fontSize: 16, 
+        fontWeight: 'bold', 
+        marginTop: 20, 
+        textAlign: 'center' 
+    },
+    cancelButton: { 
+        marginTop: 40 
+    },
+    cancelText: { 
+        color: '#666', 
+        textDecorationLine: 'underline' 
+    }
 });

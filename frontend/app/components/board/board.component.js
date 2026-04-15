@@ -1,7 +1,7 @@
 // board.component
 
 import React from "react";
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import PlayerTimer from "./timers/player-timer.component";
 import OpponentTimer from "./timers/opponent-timer.component";
 import PlayerDeck from "./decks/player-deck.component";
@@ -36,15 +36,14 @@ const Board = (props) => {
   const displayOpponentName = (opponentName || "ADVERSAIRE").toUpperCase();
 
   return (
-    <SafeAreaView style={styles.container}>
-      
+    <View style={[styles.container, { paddingTop: 40 }]}>    
       {/* Header - Info Adversaire */}
       <View style={styles.topBar}>
         <View style={styles.userInfo}>
           <RankIcon faction={opponentFaction} rank={1} />
           <View>
             <Text style={styles.opponentName}>{displayOpponentName}</Text>
-            <Text style={styles.miniScore}>Pions: {opponentPions ?? 0} | Score: {opponentScore ?? 0}</Text>
+            <Text style={styles.miniScore}>Pions: {String(opponentPions || 0)} | Score: {String(opponentScore || 0)}</Text>
           </View>
         </View>
         <OpponentTimer />
@@ -76,13 +75,13 @@ const Board = (props) => {
           <RankIcon faction={userFaction} rank={1} />
           <View>
             <Text style={[styles.playerName, { color: factionColor || '#FFF' }]}>{displayUsername}</Text>
-            <Text style={styles.miniScore}>Pions: {userPions ?? 0} | Score: {userScore ?? 0}</Text>
+            <Text style={styles.miniScore}>Pions: {String(userPions || 0)} | Score: {String(userScore || 0)}</Text>
           </View>
         </View>
         <PlayerTimer factionColor={factionColor} />
       </View>
 
-    </SafeAreaView>
+    </View>
   );
 };
 

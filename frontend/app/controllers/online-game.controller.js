@@ -69,16 +69,15 @@ export default function OnlineGameController({ user, factionColor, gameData, nav
     return (
         <View style={styles.fullScreen}>
             <Board 
-                username={gameData?.userName || user.username} 
-                userFaction={gameData?.userFaction || user.faction}
-                opponentName={gameData?.opponentName || "Adversaire"}
-                opponentFaction={gameData?.opponentFaction}
-                
-                userScore={scores.userScore}
-                userPions={scores.userPions}
-                opponentScore={scores.opponentScore}
-                opponentPions={scores.opponentPions}
-                
+                player1Name={gameData?.userName || user.username}
+                player1Faction={gameData?.userFaction || user.faction}
+                player1Score={scores.userScore}  
+                player1Pions={scores.userPions}
+                player2Name={gameData?.opponentName || "Adversaire"}
+                player2Faction={gameData?.opponentFaction}
+                player2Score={scores.opponentScore} 
+                player2Pions={scores.opponentPions} 
+                yourPlayerKey={'player:1'} 
                 factionColor={factionColor} 
             />
 

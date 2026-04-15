@@ -1,12 +1,17 @@
 import React, { createContext, useState, useEffect } from "react";
+import { Platform } from "react-native";
 import io from "socket.io-client";
 
-const socketEndpoint = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
+// Si on est sur Web (navigateur), localhost suffit. 
+// Si on est sur Mobile, on a besoin de l'IP, sinon fallback sur localhost.
+const defaultEndpoint = Platform.OS === 'web' ? 'http://localhost:3005' : 'http://127.0.0.1:3005';
+
+const socketEndpoint = process.env.EXPO_PUBLIC_API_URL || defaultEndpoint;
 
 // Création de l'instance
 export const socket = io(socketEndpoint, {
   transports: ["websocket"],
-  autoConnect: true, // Changé à true pour simplifier, ou appeler .connect()
+  autoConnect: true, 
 });
 
 export const SocketContext = createContext();

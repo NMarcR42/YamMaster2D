@@ -4,16 +4,27 @@ const http = require('http').Server(app);
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const uniqid = require('uniqid');
+const PORT = process.env.PORT || 3005; 
+const BIND_IP = '0.0.0.0';
 
 const io = require('socket.io')(http, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
+    cors: {
+        origin: "*", 
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'] 
 });
 
 const GameService = require('./services/game.service');
 const AuthController = require('./controllers/auth.controller');
 const BotService = require('./services/bot.service'); 
 
-app.use(cors()); 
+app.use(cors({
+    origin: "*", 
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(bodyParser.json());
 
 // --- ROUTES API ---
@@ -31,39 +42,87 @@ app.get('/api/leaderboard', async (req, res) => {
     res.json(await AuthController.getLeaderboard());
 });
 
-// --- GESTION DES JEUX ---
+// --- GESTION DES JEUX (AVEC FIXES ANDROID) ---
 let games = [];
 let queue = [];
 
 const updateClientsViewTimers = (game) => {
-    if (game.player1Socket) game.player1Socket.emit('game.timer', GameService.send.forPlayer.gameTimer('player:1', game.gameState));
-    if (game.player2Socket) game.player2Socket.emit('game.timer', GameService.send.forPlayer.gameTimer('player:2', game.gameState));
+    if (game.player1Socket) {
+        const t1 = GameService.send.forPlayer.gameTimer('player:1', game.gameState);
+        game.player1Socket.emit('game.timer', {
+            playerTimer: Number(t1.playerTimer || 0),
+            opponentTimer: Number(t1.opponentTimer || 0)
+        });
+    }
+    if (game.player2Socket) {
+        const t2 = GameService.send.forPlayer.gameTimer('player:2', game.gameState);
+        game.player2Socket.emit('game.timer', {
+            playerTimer: Number(t2.playerTimer || 0),
+            opponentTimer: Number(t2.opponentTimer || 0)
+        });
+    }
 };
 
 const updateClientsViewDecks = (game) => {
     setTimeout(() => {
-        if (game.player1Socket) game.player1Socket.emit('game.deck.view-state', GameService.send.forPlayer.deckViewState('player:1', game.gameState));
-        if (game.player2Socket) game.player2Socket.emit('game.deck.view-state', GameService.send.forPlayer.deckViewState('player:2', game.gameState));
+        ['player:1', 'player:2'].forEach(pKey => {
+            const socket = pKey === 'player:1' ? game.player1Socket : game.player2Socket;
+            if (socket) {
+                const data = GameService.send.forPlayer.deckViewState(pKey, game.gameState);
+                if (data) {
+                    data.displayRollButton = !!data.displayRollButton;
+                    data.canRoll = !!data.canRoll;
+                    if (data.dices) data.dices.forEach(d => d.locked = !!d.locked);
+                }
+                socket.emit('game.deck.view-state', data);
+            }
+        });
     }, 200);
 };
 
 const updateClientsViewChoices = (game) => {
     setTimeout(() => {
-        if (game.player1Socket) game.player1Socket.emit('game.choices.view-state', GameService.send.forPlayer.choicesViewState('player:1', game.gameState));
-        if (game.player2Socket) game.player2Socket.emit('game.choices.view-state', GameService.send.forPlayer.choicesViewState('player:2', game.gameState));
+        ['player:1', 'player:2'].forEach(pKey => {
+            const socket = pKey === 'player:1' ? game.player1Socket : game.player2Socket;
+            if (socket) {
+                const data = GameService.send.forPlayer.choicesViewState(pKey, game.gameState);
+                if (data) {
+                    data.displayChoices = !!data.displayChoices;
+                    data.canMakeChoice = !!data.canMakeChoice;
+                }
+                socket.emit('game.choices.view-state', data);
+            }
+        });
     }, 200);
 };
 
 const updateClientsViewGrid = (game) => {
     setTimeout(() => {
-        if (game.player1Socket) game.player1Socket.emit('game.grid.view-state', GameService.send.forPlayer.gridViewState('player:1', game.gameState));
-        if (game.player2Socket) game.player2Socket.emit('game.grid.view-state', GameService.send.forPlayer.gridViewState('player:2', game.gameState));
+        ['player:1', 'player:2'].forEach(pKey => {
+            const socket = pKey === 'player:1' ? game.player1Socket : game.player2Socket;
+            if (socket) {
+                const data = GameService.send.forPlayer.gridViewState(pKey, game.gameState);
+                if (data && data.grid) {
+                    data.grid.forEach(row => {
+                        if (row) row.forEach(cell => { if (cell) cell.canBeChecked = !!cell.canBeChecked; });
+                    });
+                }
+                socket.emit('game.grid.view-state', data);
+            }
+        });
     }, 200);
 };
 
 const updateClientsViewScores = (game) => {
-    const p1Data = { userScore: game.gameState.player1Score, userPions: game.gameState.player1Pions, opponentScore: game.gameState.player2Score, opponentPions: game.gameState.player2Pions };
-    const p2Data = { userScore: game.gameState.player2Score, userPions: game.gameState.player2Pions, opponentScore: game.gameState.player1Score, opponentPions: game.gameState.player1Pions };
+    const gs = game.gameState;
+    const p1Data = { 
+        userScore: Number(gs.player1Score || 0), userPions: Number(gs.player1Pions || 0), 
+        opponentScore: Number(gs.player2Score || 0), opponentPions: Number(gs.player2Pions || 0) 
+    };
+    const p2Data = { 
+        userScore: Number(gs.player2Score || 0), userPions: Number(gs.player2Pions || 0), 
+        opponentScore: Number(gs.player1Score || 0), opponentPions: Number(gs.player1Pions || 0) 
+    };
     if (game.player1Socket) game.player1Socket.emit('game.scores.view-state', p1Data);
     if (game.player2Socket) game.player2Socket.emit('game.scores.view-state', p2Data);
 };
@@ -71,26 +130,20 @@ const updateClientsViewScores = (game) => {
 // --- LOGIQUE DU BOT ---
 const triggerBotTurn = async (game) => {
     if (!game || !game.gameState || game.gameState.currentTurn !== 'player:2' || game.gameState.winner) return;
-
     try {
         const delay = (ms) => new Promise(res => setTimeout(res, ms));
-
         for (let i = 0; i < 3; i++) {
             const activeGame = games.find(g => g.idGame === game.idGame);
             if (!activeGame) return;
-
             await delay(1000);
             const deck = activeGame.gameState.deck;
             deck.dices = GameService.dices.roll(deck.dices);
             deck.rollsCounter++;
-            
             activeGame.gameState.choices.availableChoices = GameService.choices.findCombinations(
                 deck.dices, false, deck.rollsCounter === 1, activeGame.gameState.grid
             );
-            
             updateClientsViewDecks(activeGame);
             updateClientsViewChoices(activeGame);
-
             if (deck.rollsCounter < deck.rollsMaximum) {
                 const locks = BotService.decideDiceToLock(deck.dices, deck.rollsCounter, activeGame.difficulty);
                 deck.dices.forEach(d => { if (locks.includes(d.id)) d.locked = true; });
@@ -101,28 +154,22 @@ const triggerBotTurn = async (game) => {
             }
             updateClientsViewDecks(activeGame);
         }
-
         await delay(1000);
         const choices = game.gameState.choices.availableChoices;
         if (!choices || choices.length === 0) return finalizeTurn(game); 
-
         const choice = BotService.chooseBestCombination(choices, game.difficulty);
         if (!choice || !choice.id) return finalizeTurn(game);
-
         game.gameState.choices.idSelectedChoice = choice.id;
         game.gameState.grid = GameService.grid.updateGridAfterSelectingChoice(choice.id, game.gameState.grid);
         updateClientsViewChoices(game);
         updateClientsViewGrid(game);
-
         await delay(1000);
         const cellCoords = BotService.chooseGridCell(game.gameState.grid, choice.id, game.difficulty, 'player:2');
-        
         if (cellCoords && cellCoords.cellId && cellCoords.rIdx !== undefined) {
             handleGridSelection(game, 'player:2', cellCoords.cellId, cellCoords.rIdx, cellCoords.cIdx);
         } else {
             finalizeTurn(game);
         }
-
     } catch (error) {
         console.error("❌ ERREUR BOT :", error);
         if (game) finalizeTurn(game);
@@ -133,7 +180,6 @@ const handleGridSelection = (game, playerKey, cellId, rowIndex, cellIndex) => {
     try {
         const gs = game.gameState;
         if (rowIndex === undefined || rowIndex === -1 || !gs.grid[rowIndex]) return finalizeTurn(game);
-
         const cell = gs.grid[rowIndex][cellIndex];
         if (!cell) return finalizeTurn(game);
         if (playerKey === 'player:1' && !cell.canBeChecked) return;
@@ -159,10 +205,13 @@ const handleGridSelection = (game, playerKey, cellId, rowIndex, cellIndex) => {
         }
 
         if (gs.winner) {
-            const endData = { winner: gs.winner, p1Score: gs.player1Score, p2Score: gs.player2Score, p1Id: game.player1Id, p2Id: game.player2Id };
+            const endData = { 
+                winner: String(gs.winner), 
+                p1Score: Number(gs.player1Score || 0), p2Score: Number(gs.player2Score || 0), 
+                p1Id: String(game.player1Id || ""), p2Id: String(game.player2Id || "") 
+            };
             if (game.player1Socket) game.player1Socket.emit('game.end', endData);
-            if (game.player2Socket) game.player2Socket.emit('game.end', endData); // Notifier aussi le P2
-            
+            if (game.player2Socket) game.player2Socket.emit('game.end', endData);
             setTimeout(() => { 
                 const idx = games.findIndex(g => g.idGame === game.idGame); 
                 if (idx !== -1) games.splice(idx, 1); 
@@ -184,19 +233,19 @@ const createGame = (player1Socket, player2Socket, isVsBot = false, difficulty = 
         player2Socket: isVsBot ? null : player2Socket,
         player1Id: player1Socket.id, 
         player2Id: isVsBot ? 'bot-id' : player2Socket.id,
-        player1Name: player1Socket.username || "Joueur 1", 
-        player2Name: isVsBot ? `Bot (${difficulty.toUpperCase()})` : (player2Socket.username || "Joueur 2"),
-        player1Faction: player1Socket.faction || "horde", 
-        player2Faction: isVsBot ? "alliance" : (player2Socket.faction || "alliance"),
+        player1Name: String(player1Socket.username || "Joueur 1"), 
+        player2Name: String(isVsBot ? `Bot (${difficulty.toUpperCase()})` : (player2Socket.username || "Joueur 2")),
+        player1Faction: String(player1Socket.faction || "horde"), 
+        player2Faction: String(isVsBot ? "alliance" : (player2Socket.faction || "alliance")),
         gameState: gameData.gameState,
-        isVsBot,
-        difficulty
+        isVsBot: !!isVsBot,
+        difficulty: String(difficulty)
     };
 
     newGame.gameState.player1Score = 0;
     newGame.gameState.player2Score = 0;
-    newGame.gameState.player1Pions = 22; 
-    newGame.gameState.player2Pions = 22;
+    newGame.gameState.player1Pions = 12; 
+    newGame.gameState.player2Pions = 12;
 
     games.push(newGame);
 
@@ -233,11 +282,9 @@ const createGame = (player1Socket, player2Socket, isVsBot = false, difficulty = 
             updateClientsViewDecks(activeGame);
             updateClientsViewChoices(activeGame);
             updateClientsViewGrid(activeGame);
-            updateClientsViewScores(activeGame); // Assurer la synchro du score au changement de tour
+            updateClientsViewScores(activeGame);
 
-            if (activeGame.gameState.currentTurn === 'player:2' && activeGame.isVsBot) {
-                triggerBotTurn(activeGame);
-            }
+            if (activeGame.gameState.currentTurn === 'player:2' && activeGame.isVsBot) triggerBotTurn(activeGame);
         } else {
             updateClientsViewTimers(activeGame);
         }
@@ -255,20 +302,14 @@ const finalizeTurn = (game) => {
     updateClientsViewDecks(game); 
     updateClientsViewChoices(game);
     updateClientsViewGrid(game);
-    updateClientsViewScores(game); // Synchro score systématique
+    updateClientsViewScores(game);
 
-    if (gs.currentTurn === 'player:2' && game.isVsBot) {
-        triggerBotTurn(game);
-    }
+    if (gs.currentTurn === 'player:2' && game.isVsBot) triggerBotTurn(game);
 };
 
 io.on('connection', socket => {
     socket.on('user.setup', (data) => { socket.username = data.username; socket.faction = data.faction; });
-
-    socket.on('game.vs-bot.start', (data) => {
-        createGame(socket, null, true, data.difficulty);
-    });
-
+    socket.on('game.vs-bot.start', (data) => { createGame(socket, null, true, data.difficulty); });
     socket.on('queue.join', (data) => {
         if (data && data.username) socket.username = data.username;
         if (!socket.username) return;
@@ -276,17 +317,14 @@ io.on('connection', socket => {
         if (queue.length >= 2) createGame(queue.shift(), queue.shift());
         else socket.emit('queue.added', GameService.send.forPlayer.viewQueueState());
     });
-
     socket.on('game.dices.roll', () => {
         const game = games.find(g => g.player1Id === socket.id || g.player2Id === socket.id);
         if (!game) return;
         const deck = game.gameState.deck;
         if (deck.rollsCounter >= deck.rollsMaximum) return;
-
         deck.dices = GameService.dices.roll(deck.dices);
         deck.rollsCounter++;
         game.gameState.choices.availableChoices = GameService.choices.findCombinations(deck.dices, false, deck.rollsCounter === 1, game.gameState.grid);
-
         if (deck.rollsCounter >= deck.rollsMaximum) {
             deck.dices = GameService.dices.lockEveryDice(deck.dices);
             game.gameState.timer = GameService.timer.getEndTurnDuration();
@@ -295,20 +333,14 @@ io.on('connection', socket => {
         updateClientsViewChoices(game);
         updateClientsViewTimers(game);
     });
-
     socket.on('game.dices.lock', (data) => {
         const game = games.find(g => g.player1Id === socket.id || g.player2Id === socket.id);
         if (!game) return;
         const playerKey = socket.id === game.player1Id ? 'player:1' : 'player:2';
         if (game.gameState.currentTurn !== playerKey) return;
-
         const dice = game.gameState.deck.dices.find(d => d.id === data.diceId);
-        if (dice) {
-            dice.locked = !dice.locked;
-            updateClientsViewDecks(game);
-        }
+        if (dice) { dice.locked = !dice.locked; updateClientsViewDecks(game); }
     });
-
     socket.on('game.choices.selected', (data) => {
         const game = games.find(g => g.player1Id === socket.id || g.player2Id === socket.id);
         if (!game) return;
@@ -318,7 +350,6 @@ io.on('connection', socket => {
         updateClientsViewChoices(game);
         updateClientsViewGrid(game);
     });
-
     socket.on('game.grid.selected', (data) => {
         const game = games.find(g => g.player1Id === socket.id || g.player2Id === socket.id);
         if (!game) return;
@@ -326,7 +357,6 @@ io.on('connection', socket => {
         if (game.gameState.currentTurn !== playerKey) return;
         handleGridSelection(game, playerKey, data.cellId, data.rowIndex, data.cellIndex);
     });
-
     socket.on('disconnect', () => {
         queue = queue.filter(s => s.id !== socket.id);
         const gIdx = games.findIndex(g => g.player1Id === socket.id || g.player2Id === socket.id);
@@ -338,4 +368,6 @@ io.on('connection', socket => {
     });
 });
 
-http.listen(3000, () => { console.log('Server running on port 3000'); });
+http.listen(PORT, BIND_IP, () => {
+    console.log(`✅ Serveur Yam Master actif sur http://${BIND_IP}:${PORT}`);
+});

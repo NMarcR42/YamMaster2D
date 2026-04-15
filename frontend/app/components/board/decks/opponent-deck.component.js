@@ -24,7 +24,7 @@ const OpponentDeck = () => {
         <View style={styles.container}>
             {dices.map((dice, index) => (
                 <Dice 
-                    key={index} 
+                    key={`opp-dice-${index}`} 
                     value={dice.value} 
                     locked={dice.locked} 
                     opponent={true} 

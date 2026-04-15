@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, TextInput, SafeAreaView, Image, ScrollView, Alert } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity, TextInput, Image, ScrollView, Alert } from "react-native";
 import { SocketContext } from "../contexts/socket.context";
 
 export default function HomeScreen({ navigation }) {
@@ -59,7 +59,7 @@ export default function HomeScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={[styles.container, { paddingTop: 40 }]}>
             <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 40 }}>
                 <View style={styles.header}>
                     <Text style={styles.titleGold}>YAM MASTER</Text>
@@ -70,7 +70,7 @@ export default function HomeScreen({ navigation }) {
 
                 {!user ? (
                     <View style={[styles.authCard, { borderLeftColor: factionColor }]}>
-                        {isRegister && (
+                        {!!isRegister && (
                             <View style={styles.factionPicker}>
                                 <TouchableOpacity
                                     style={[styles.fBtn, form.faction === 'horde' && styles.fBtnHorde]}
@@ -95,7 +95,7 @@ export default function HomeScreen({ navigation }) {
                         <TextInput
                             style={styles.input}
                             placeholder="MOT DE PASSE"
-                            secureTextEntry
+                            secureTextEntry={true}
                             placeholderTextColor="#666"
                             onChangeText={t => setForm({ ...form, password: t })}
                         />
@@ -111,7 +111,6 @@ export default function HomeScreen({ navigation }) {
                         </TouchableOpacity>
                     </View>
                 ) : (
-                    /* Vue de transition si l'utilisateur est déjà chargé mais pas encore redirigé */
                     <View style={styles.profileCard}>
                         <Text style={styles.userName}>CHARGEMENT DES ARMÉES...</Text>
                     </View>
@@ -128,7 +127,7 @@ export default function HomeScreen({ navigation }) {
                     ))}
                 </View>
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 

@@ -10,8 +10,11 @@ const Grid = ({ factionColor }) => {
     useEffect(() => {
         if (!socket) return;
         socket.on("game.grid.view-state", (data) => {
-            setGrid(data['grid']);
-            setYourPlayerKey(data['yourPlayerKey']); 
+            // Sécurité : s'assurer que data.grid existe
+            if (data && data.grid) {
+                setGrid(data.grid);
+                setYourPlayerKey(data.yourPlayerKey); 
+            }
         });
         return () => socket.off("game.grid.view-state");
     }, [socket]);
@@ -22,30 +25,32 @@ const Grid = ({ factionColor }) => {
 
     return (
         <View style={styles.grid}>
-            {grid.map((row, rowIndex) => (
-                <View key={rowIndex} style={styles.row}>
-                    {row.map((cell, cellIndex) => {
-                        // LOGIQUE DE COULEUR DYNAMIQUE
+            {(grid || []).map((row, rowIndex) => (
+                <View key={`row-${rowIndex}`} style={styles.row}>
+                    {(row || []).map((cell, cellIndex) => {
+                        
                         const isMine = cell.owner === yourPlayerKey;
-                        const isOpponent = cell.owner !== null && cell.owner !== yourPlayerKey;
+                        const isOpponent = cell.owner !== null && cell.owner !== undefined && cell.owner !== yourPlayerKey;
+                        const canInteract = !!cell.canBeChecked; // Sécurité String to Boolean
 
                         return (
                             <TouchableOpacity
-                                key={`${rowIndex}-${cellIndex}`}
+                                key={`cell-${rowIndex}-${cellIndex}`}
                                 style={[
                                     styles.cell,
-                                    isMine && { backgroundColor: factionColor },
-                                    isOpponent && { backgroundColor: '#000' }, // Noir pour l'adversaire
-                                    cell.canBeChecked && styles.playable
+                                    isMine && { backgroundColor: factionColor || '#1e90ff' },
+                                    isOpponent && { backgroundColor: '#000' },
+                                    canInteract && styles.playable
                                 ]}
                                 onPress={() => handleSelectCell(cell.id, rowIndex, cellIndex)}
-                                disabled={!cell.canBeChecked}
+                                disabled={!canInteract}
                             >
                                 <Text style={[
                                     styles.cellText, 
                                     (isMine || isOpponent) && { color: '#FFF' }
                                 ]}>
-                                    {cell.viewContent}
+                                    {/* Sécurité : toujours afficher une string */}
+                                    {String(cell.viewContent || "")}
                                 </Text>
                             </TouchableOpacity>
                         );

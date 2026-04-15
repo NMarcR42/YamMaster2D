@@ -32,14 +32,16 @@ const PlayerDeck = ({ factionColor }) => {
       ))}
       </View>
 
-      {deckData.displayRollButton && (
+      {deckData.displayRollButton ? (
         <TouchableOpacity 
-            style={[styles.rollBtn, { backgroundColor: factionColor }]} 
+            style={[styles.rollBtn, { backgroundColor: factionColor || '#D4AF37' }]} 
             onPress={() => socket.emit("game.dices.roll")}
         >
-          <Text style={styles.rollText}>LANCER LES DÉS ({deckData.rollsCounter}/3)</Text>
+          <Text style={styles.rollText}>
+            LANCER LES DÉS ({String(deckData.rollsCounter)}/3)
+          </Text>
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   );
 };

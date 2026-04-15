@@ -27,9 +27,9 @@ const Dice = ({ index, locked, value, onPress, opponent, rolling }) => {
           opponent && styles.opponentDice
       ]}
       onPress={onPress}
-      disabled={opponent}
+      disabled={!!opponent}
       >
-        <Text style={[styles.diceText, locked && styles.lockedText]}>{value}</Text>
+        <Text style={[styles.diceText, locked && styles.lockedText]}>{value ? String(value) : ""} </Text>
       </TouchableOpacity>
     </Animated.View>
   );

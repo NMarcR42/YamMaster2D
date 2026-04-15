@@ -13,14 +13,12 @@ const Choices = ({ factionColor }) => {
 
     useEffect(() => {
         if (!socket) return;
-
         socket.on("game.choices.view-state", (data) => {
-            setDisplayChoices(data['displayChoices']);
-            setCanMakeChoice(data['canMakeChoice']);
+            setDisplayChoices(!!data['displayChoices']);
+            setCanMakeChoice(!!data['canMakeChoice']);
             setIdSelectedChoice(data['idSelectedChoice']);
-            setAvailableChoices(data['availableChoices']);
+            setAvailableChoices(data['availableChoices'] || []);
         });
-
         return () => socket.off("game.choices.view-state");
     }, [socket]);
 
@@ -49,7 +47,7 @@ const Choices = ({ factionColor }) => {
                             styles.choiceText,
                             idSelectedChoice === choice.id && { color: '#000' }
                         ]}>
-                            {choice.value}
+                            {String(choice.value || "")}
                         </Text>
                     </TouchableOpacity>
                 ))}
