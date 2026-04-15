@@ -46,23 +46,22 @@ Le projet repose sur une architecture **Event-Driven** (pilotée par les événe
 
 
 
-### Architecture du Code (Backend)
-* `/services` : Logique pure (calcul des scores, détection des suites, IA du Bot).
-* `/controllers` : Gestion de l'authentification et de la persistance (PostgreSQL).
-* `index.js` : Point d'entrée gérant les cycles de vie des sockets.
+### Architecture du Projet
 
+```text
 .
-├── docker-compose.yml         # Orchestration des services (DB + App)
-├── backend/                   # Dossier Serveur Node.js
-│   ├── index.js               # Point d'entrée & gestion des Sockets
-│   ├── Dockerfile             # Configuration de l'image Docker
-│   ├── init.sql               # Schéma initial PostgreSQL
-│   ├── controllers/           # Auth & Persistance des données
-│   └── services/              # Logique métier (IA Bot, Scores)
-└── frontend/                  # Dossier Application Mobile (React Native)
-    ├── App.js                 # Entrée principale de l'app
-    ├── .env                   # Configuration des URLs API/Socket
-    └── contexts/              # Gestion de l'état global (Socket.context)
+├── docker-compose.yml     # Orchestration des services (DB + App)
+├── backend/               # Dossier Serveur Node.js
+│   ├── index.js           # Point d'entrée & Sockets
+│   ├── Dockerfile         # Image Docker du serveur
+│   ├── init.sql           # Schéma PostgreSQL
+│   ├── controllers/       # Auth & Persistance
+│   └── services/          # Logique métier (IA, Scores)
+└── frontend/              # Application Mobile (React Native)
+    ├── App.js             # Entrée de l'application
+    ├── .env               # Configuration URLs
+    └── contexts/          # Gestion de l'état (Socket.context)
+```
 
 ## 🛠️ Configuration & Installation
 ### 📋 Pré-requis
